@@ -14,6 +14,8 @@ from bleak.backends.scanner import AdvertisementData
 from victron_ble.devices import Device, DeviceData, detect_device_type
 from victron_ble.exceptions import AdvertisementKeyMissingError, UnknownDeviceError
 
+import paho.mqtt.publish as publish
+
 logger = logging.getLogger(__name__)
 
 
@@ -112,7 +114,21 @@ class Scanner(BaseScanner):
             "rssi": ble_device.rssi,
             "payload": parsed,
         }
-        print(json.dumps(blob, cls=DeviceDataEncoder, indent=2))
+
+        decoded_data_str = json.dumps(blob, cls=DeviceDataEncoder, indent=2)
+        decoded_data = json.loads(decoded_data_str)
+
+        msgs = [
+            {'topic': f"victron/{decoded_data['address']}/name", 'payload': decoded_data['name']},
+            {'topic': f"victron/{decoded_data['address']}/rssi", 'payload': str(decoded_data['rssi'])},
+        ]
+
+        for key, value in decoded_data['payload'].items():
+            msgs.append({'topic': f"victron/{decoded_data['address']}/{key}", 'payload': str(value)})
+        
+        host = "localhost"
+        print(msgs)
+        publish.multiple(msgs, hostname=host)
 
 
 class DiscoveryScanner(BaseScanner):
